@@ -55,6 +55,7 @@ static Uuid s_app_uuid;
 
 static AudioEndpointSessionId s_session_id = AUDIO_ENDPOINT_SESSION_INVALID_ID;
 static TimerID s_timeout = TIMER_INVALID_ID;
+static TimerID s_cleanup_timer = TIMER_INVALID_ID;
 
 // Session generation & teardown guards to mitigate race conditions between explicit cancel
 // and timeout callbacks executing on the timer thread.
@@ -312,11 +313,19 @@ static void prv_session_result_timeout(void * data) {
 
 static void prv_delayed_cleanup_timeout(void *data) {
   mutex_lock(s_lock);
-  
+
   voice_speex_deinit();
   s_delayed_speex_cleanup = false;
-  
+
   mutex_unlock(s_lock);
+}
+
+static void prv_start_delayed_speex_cleanup(void) {
+  if (s_cleanup_timer == TIMER_INVALID_ID) {
+    s_cleanup_timer = new_timer_create();
+  }
+  s_delayed_speex_cleanup = true;
+  new_timer_start(s_cleanup_timer, 100, prv_delayed_cleanup_timeout, NULL, 0);
 }
 
 static void prv_session_setup_timeout(void * data) {
@@ -506,19 +515,16 @@ void voice_cancel_dictation(VoiceSessionId session_id) {
         s_state == SessionState_AudioEndpointSetupReceived) {
       prv_cancel_early_session();
       // Use delayed cleanup for early cancellation to avoid race conditions with phone/endpoint
-      s_delayed_speex_cleanup = true;
-      new_timer_start(s_timeout, 100, prv_delayed_cleanup_timeout, NULL, 0);
+      prv_start_delayed_speex_cleanup();
       prv_reset();
     } else if (s_state == SessionState_Recording) {
       prv_stop_recording();
       // Use delayed cleanup to avoid race condition with microphone
-      s_delayed_speex_cleanup = true;
-      new_timer_start(s_timeout, 100, prv_delayed_cleanup_timeout, NULL, 0);
+      prv_start_delayed_speex_cleanup();
       prv_reset();
     } else if (s_state == SessionState_WaitForSessionResult) {
       // Recording is done but audio endpoint might still be processing
-      s_delayed_speex_cleanup = true;
-      new_timer_start(s_timeout, 100, prv_delayed_cleanup_timeout, NULL, 0);
+      prv_start_delayed_speex_cleanup();
       prv_reset();
     } else {
       // For any other state, safe to reset immediately
