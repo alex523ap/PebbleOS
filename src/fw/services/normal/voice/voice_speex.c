@@ -1,4 +1,4 @@
-/* SPDX-FileCopyrightText: 2025 Joshua Jun */
+/* SPDX-FileCopyrightText: 2025 Core Devices LLC */
 /* SPDX-License-Identifier: Apache-2.0 */
 
 #include "voice_speex.h"
@@ -52,7 +52,7 @@ static VoiceSpeexEncoder s_encoder = {0};
 #define SPEEX_QUALITY 6          // Quality level (0-10)
 #define SPEEX_COMPLEXITY 1       // Complexity (1-10, lower for embedded)
 #define SPEEX_ENCODED_BUFFER_SIZE 320  // Max encoded frame size
-#define SPEEX_AUDIO_GAIN 3       // Audio gain multiplier (3x)
+#define SPEEX_AUDIO_GAIN 1       // Audio gain multiplier (hw drivers handle gain)
 
 bool voice_speex_init(void) {
   if (s_encoder.initialized) {
